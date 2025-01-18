@@ -1,2 +1,17 @@
+# Node modules
 node_modules/
+
+# Environment variables
 .env
+
+# Redis dump
+dump.rdb
+appendonly.aof
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Credentials file
+src/config/credentials.json
+
