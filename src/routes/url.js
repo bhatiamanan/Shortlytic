@@ -162,6 +162,53 @@ const aggregateByField = (clicks, field) => {
     }));
 };
 
+// GET /api/analytics/topic/:topic - Retrieve analytics for all URLs under a topic
+router.get('/analytics/topic/:topic', async (req, res) => {
+    const { topic } = req.params;
+
+    try {
+        // Find all URLs under the given topic
+        const urls = await Url.find({ topic });
+
+        if (urls.length === 0) {
+            return res.status(404).json({ error: 'No URLs found for this topic' });
+        }
+
+        // Initialize analytics data
+        let totalClicks = 0;
+        const uniqueUserSet = new Set();
+        let allClicks = [];
+
+        const urlsData = urls.map(url => {
+            totalClicks += url.analytics.length;
+            url.analytics.forEach(entry => {
+                uniqueUserSet.add(entry.ip);
+                allClicks.push(entry);
+            });
+
+            return {
+                shortUrl: url.shortUrl,
+                totalClicks: url.analytics.length,
+                uniqueUsers: new Set(url.analytics.map(click => click.ip)).size
+            };
+        });
+
+        // Use the existing aggregateClicksByDate function
+        const clicksByDate = aggregateClicksByDate(allClicks);
+
+        res.status(200).json({
+            totalClicks,
+            uniqueUsers: uniqueUserSet.size,
+            clicksByDate,
+            urls: urlsData
+        });
+
+    } catch (err) {
+        console.error('Error fetching topic analytics:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 
 
 // Use ES Module export
