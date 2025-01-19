@@ -44,5 +44,48 @@ router.post('/', async (req, res) => {
     }
 });
 
+// GET /api/shorten/:alias - Redirect to the original long URL
+router.get('/:alias', async (req, res) => {
+    const { alias } = req.params;
+
+    try {
+        // Check Redis cache first
+        const cachedUrl = await redisClient.get(alias);
+        if (cachedUrl) {
+            console.log(`Cache hit for alias: ${alias}`);
+            logAnalytics(req, alias);
+            return res.redirect(cachedUrl);
+        }
+
+        // If not found in cache, query MongoDB
+        const urlEntry = await Url.findOne({ customAlias: alias });
+        if (!urlEntry) {
+            return res.status(404).json({ error: 'Short URL not found' });
+        }
+
+        // Cache the URL for future lookups
+        await redisClient.set(alias, urlEntry.longUrl);
+
+        // Log analytics before redirecting
+        logAnalytics(req, alias);
+
+        res.redirect(urlEntry.longUrl);
+    } catch (err) {
+        console.error('Error redirecting:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Function to log analytics
+const logAnalytics = (req, alias) => {
+    const analyticsData = {
+        timestamp: new Date(),
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+    };
+    console.log(`Analytics for ${alias}:`, analyticsData);
+    // Future scope: Save analyticsData to DB or logging system.
+};
+
 // Use ES Module export
 export default router;
