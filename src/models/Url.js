@@ -6,8 +6,15 @@ const urlSchema = new mongoose.Schema({
     customAlias: { type: String, unique: true },
     topic: { type: String },
     createdAt: { type: Date, default: Date.now },
+    analytics: [
+        {
+            timestamp: { type: String },
+            ip: { type: String },
+            os: { type: String },
+            device: { type: String },
+            browser: { type: String },
+        }
+    ],
 });
 
-const Url = mongoose.model('Url', urlSchema);
-
-export default Url;
+export default mongoose.model('Url', urlSchema);

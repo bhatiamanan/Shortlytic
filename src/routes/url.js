@@ -1,7 +1,9 @@
 import express from 'express';
 import { nanoid } from 'nanoid';
-import redisClient from '../config/redis.js'; // Ensure the file has a `.js` extension
+import redisClient from '../config/redis.js';
 import Url from '../models/Url.js';
+import useragent from 'useragent';
+
 
 const router = express.Router();
 
@@ -44,48 +46,49 @@ router.post('/', async (req, res) => {
     }
 });
 
-// GET /api/shorten/:alias - Redirect to the original long URL
+// GET /api/shorten/:alias - Redirect to original URL and track analytics
 router.get('/:alias', async (req, res) => {
     const { alias } = req.params;
 
     try {
         // Check Redis cache first
-        const cachedUrl = await redisClient.get(alias);
-        if (cachedUrl) {
-            console.log(`Cache hit for alias: ${alias}`);
-            logAnalytics(req, alias);
-            return res.redirect(cachedUrl);
+        let longUrl = await redisClient.get(alias);
+        if (!longUrl) {
+            const urlEntry = await Url.findOne({ customAlias: alias });
+            if (!urlEntry) {
+                return res.status(404).json({ error: 'Short URL not found' });
+            }
+            longUrl = urlEntry.longUrl;
+
+            // Store in Redis for future lookups
+            await redisClient.set(alias, longUrl);
         }
 
-        // If not found in cache, query MongoDB
-        const urlEntry = await Url.findOne({ customAlias: alias });
-        if (!urlEntry) {
-            return res.status(404).json({ error: 'Short URL not found' });
-        }
+        // Parse user agent data for analytics
+        const agent = useragent.parse(req.headers['user-agent']);
+        const analyticsEntry = {
+            timestamp: new Date().toISOString(),
+            ip: req.ip,
+            os: agent.os.toString(),
+            device: agent.device.toString(),
+            browser: agent.toAgent(),
+        };
 
-        // Cache the URL for future lookups
-        await redisClient.set(alias, urlEntry.longUrl);
+        // Save analytics data to MongoDB
+        await Url.updateOne(
+            { customAlias: alias },
+            { $push: { analytics: analyticsEntry } }
+        );
 
-        // Log analytics before redirecting
-        logAnalytics(req, alias);
-
-        res.redirect(urlEntry.longUrl);
+        console.log(`Redirecting to: ${longUrl}, Analytics saved:`, analyticsEntry);
+        
+        res.redirect(longUrl);
     } catch (err) {
         console.error('Error redirecting:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
 
-// Function to log analytics
-const logAnalytics = (req, alias) => {
-    const analyticsData = {
-        timestamp: new Date(),
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-    };
-    console.log(`Analytics for ${alias}:`, analyticsData);
-    // Future scope: Save analyticsData to DB or logging system.
-};
 
 // Use ES Module export
 export default router;
