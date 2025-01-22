@@ -5,11 +5,10 @@ import passport from 'passport';
 import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/auth.js';
 import urlRoutes from './routes/url.js';
-import redisClient from './config/redis.js';
-import './config/passport.js'; // Initialize Google OAuth
+import analyticsRoutes from './routes/analytics.js';
+import './config/passport.js';
 
-
-const result = dotenv.config({ path: './.env' });
+dotenv.config({ path: './.env' });
 
 
 const app = express();
@@ -29,6 +28,7 @@ const urlCreationLimiter = rateLimit({
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/shorten', urlCreationLimiter, urlRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Database Connection
 mongoose.connect(process.env.MONGO_URI)
