@@ -6,6 +6,59 @@ import useragent from 'useragent';
 
 const router = express.Router();
 
+/**
+ * @swagger
+ * /api/shorten:
+ *   post:
+ *     summary: Create a short URL
+ *     description: Generates a short URL for a given long URL with an optional custom alias and topic.
+ *     tags:
+ *       - URL Shortener
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - longUrl
+ *             properties:
+ *               longUrl:
+ *                 type: string
+ *                 example: "https://example.com"
+ *               customAlias:
+ *                 type: string
+ *                 example: "examplealias"
+ *               topic:
+ *                 type: string
+ *                 example: "test-topic"
+ *     responses:
+ *       '201':
+ *         description: Successfully created short URL
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 shortUrl:
+ *                   type: string
+ *                   example: "http://localhost:3000/examplealias"
+ *                 createdAt:
+ *                   type: string
+ *                   format: date-time
+ *       '400':
+ *         description: Invalid input or alias already exists
+ *         content:
+ *           application/json:
+ *             example:
+ *               error: "Custom alias is already in use"
+ *       '500':
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             example:
+ *               error: "Server error"
+ */
 // POST /api/shorten
 router.post('/', async (req, res) => {
     const { longUrl, customAlias, topic } = req.body;
@@ -45,6 +98,37 @@ router.post('/', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/shorten/{alias}:
+ *   get:
+ *     summary: Redirect to original URL
+ *     description: Redirects to the original long URL using the provided short URL alias and tracks analytics.
+ *     tags: 
+ *       - URL Shortener
+ *     parameters:
+ *       - in: path
+ *         name: alias
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The custom alias of the shortened URL
+ *     responses:
+ *       '302':
+ *         description: Redirects to the original URL
+ *       '404':
+ *         description: Short URL not found
+ *         content:
+ *           application/json:
+ *             example:
+ *               error: "The requested short URL does not exist in our system"
+ *       '500':
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             example:
+ *               error: "Internal server error"
+ */
 // GET /api/shorten/:alias - Redirect to original URL and track analytics
 router.get('/:alias', async (req, res) => {
     const { alias } = req.params;
@@ -55,7 +139,7 @@ router.get('/:alias', async (req, res) => {
         if (!longUrl) {
             const urlEntry = await Url.findOne({ customAlias: alias });
             if (!urlEntry) {
-                return res.status(404).json({ error: 'Short URL not found' });
+                return res.status(404).json({ error: 'The requested short URL does not exist in our system' });
             }
             longUrl = urlEntry.longUrl;
 
